@@ -1,12 +1,13 @@
 use chrono::prelude::*;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct NotCompletedTask {
     pub name: String,
     pub dt_start: DateTime<Local>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct CompletedTask {
     pub name: String,
     pub dt_start: DateTime<Local>,

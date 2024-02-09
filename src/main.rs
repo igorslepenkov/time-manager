@@ -1,24 +1,29 @@
-use chrono::Timelike;
 use colorful::Colorful;
 use regex::Regex;
 use std::{
     env,
     io::{self, BufRead},
+    path::PathBuf,
 };
-
-use rust_xlsxwriter::{ExcelDateTime, Format, Formula, Workbook};
 
 use time_manager::{
     add_task_to_completed,
     command::{get_command, ManagerCommand},
+    save_state_as_xlsx,
     state::{self, DailyState},
     task::NotCompletedTask,
 };
 
+const STATE_FILE_NAME: &str = "state.json";
+
 fn main() {
+    let current_exe_path = env::current_exe().unwrap();
+    let current_dir_path = current_exe_path.parent().unwrap();
+    let state_file_path = current_dir_path.join(STATE_FILE_NAME);
+
     let mut stdin = io::stdin().lock();
 
-    let mut state: DailyState = state::DailyState::init();
+    let mut state: DailyState = state::DailyState::init(&state_file_path).unwrap();
 
     println!(
         "Started work at {}",
@@ -48,8 +53,12 @@ fn main() {
                             Some(command_arg) => {
                                 let command = get_command(command_arg);
 
-                                let command_result =
-                                    execute_command(&command, parsed_arguments, &mut state);
+                                let command_result = execute_command(
+                                    &command,
+                                    parsed_arguments,
+                                    &mut state,
+                                    &state_file_path,
+                                );
 
                                 match command_result {
                                     Err(err) => {
@@ -122,19 +131,24 @@ fn execute_command(
     command: &ManagerCommand,
     args_vec: Vec<String>,
     state: &mut DailyState,
+    state_file_path: &PathBuf,
 ) -> Result<String, String> {
     match command {
-        ManagerCommand::StartTrack => execute_start_command(args_vec, state),
+        ManagerCommand::StartTrack => execute_start_command(args_vec, state, state_file_path),
 
-        ManagerCommand::PauseTrack => execute_pause_command(args_vec, state),
+        ManagerCommand::PauseTrack => execute_pause_command(args_vec, state, state_file_path),
 
-        ManagerCommand::EndTrack => execute_end_command(args_vec, state),
+        ManagerCommand::EndTrack => execute_end_command(args_vec, state, state_file_path),
 
         ManagerCommand::Error => Err("Could not find command".to_string()),
     }
 }
 
-fn execute_start_command(args_vec: Vec<String>, state: &mut DailyState) -> Result<String, String> {
+fn execute_start_command(
+    args_vec: Vec<String>,
+    state: &mut DailyState,
+    state_file_path: &PathBuf,
+) -> Result<String, String> {
     let task_name_option = args_vec.get(1);
 
     match task_name_option {
@@ -152,12 +166,18 @@ fn execute_start_command(args_vec: Vec<String>, state: &mut DailyState) -> Resul
 
             state.current_task.replace(new_task);
 
+            let _ = state.save(state_file_path);
+
             Ok(format!("Started new task. Current task: {}", task_name))
         }
     }
 }
 
-fn execute_pause_command(args_vec: Vec<String>, state: &mut DailyState) -> Result<String, String> {
+fn execute_pause_command(
+    args_vec: Vec<String>,
+    state: &mut DailyState,
+    state_file_path: &PathBuf,
+) -> Result<String, String> {
     let previous_task_completion_message = args_vec.get(1);
     let complete_task_result = complete_current_task(state, previous_task_completion_message);
 
@@ -167,12 +187,18 @@ fn execute_pause_command(args_vec: Vec<String>, state: &mut DailyState) -> Resul
         return Err(err);
     }
 
+    let _ = state.save(state_file_path);
+
     println!("Track paused at {}", chrono::Local::now());
 
     Ok("Track is paused. Out of keyboard".to_string())
 }
 
-fn execute_end_command(args_vec: Vec<String>, state: &mut DailyState) -> Result<String, String> {
+fn execute_end_command(
+    args_vec: Vec<String>,
+    state: &mut DailyState,
+    state_file_path: &PathBuf,
+) -> Result<String, String> {
     let previous_task_completion_message = args_vec.get(1);
     let complete_task_result = complete_current_task(state, previous_task_completion_message);
 
@@ -180,100 +206,16 @@ fn execute_end_command(args_vec: Vec<String>, state: &mut DailyState) -> Result<
         return Err(err);
     }
 
-    let mut workbook = Workbook::new();
-    let worksheet = workbook.add_worksheet();
+    let save_result = save_state_as_xlsx(state);
 
-    let date_format = Format::new()
-        .set_num_format("hh:mm")
-        .set_text_wrap()
-        .set_background_color("#EEEEEE")
-        .set_font_name("Nunito")
-        .set_font_size(10)
-        .set_bold();
+    match save_result {
+        Ok(file_path) => {
+            let _ = state.clear_todays_state(state_file_path);
 
-    let date = state.start_time.format("%d.%m.%Y").to_string();
-
-    let _ = worksheet.set_name(&date);
-
-    let _ = worksheet.write_with_format(0, 0, &date, &date_format);
-
-    let completed_tasks = state.completed_tasks.lock().unwrap();
-
-    for (idx, task) in completed_tasks.to_vec().iter().enumerate() {
-        let date_format = Format::new()
-            .set_num_format("hh:mm")
-            .set_text_wrap()
-            .set_background_color("#EEEEEE")
-            .set_font_name("Nunito")
-            .set_font_size(10);
-
-        let start_time_xlsx = ExcelDateTime::from_hms(
-            task.dt_start.hour().try_into().unwrap(),
-            task.dt_start.minute().try_into().unwrap(),
-            task.dt_start.second(),
-        )
-        .unwrap();
-
-        let end_time_xlsx = ExcelDateTime::from_hms(
-            task.dt_end.hour().try_into().unwrap(),
-            task.dt_end.minute().try_into().unwrap(),
-            task.dt_end.second(),
-        )
-        .unwrap();
-
-        let row_idx: u32 = idx.try_into().unwrap();
-
-        let time_difference_formula = Formula::new(format!("=E{0}-D{0}", row_idx + 1));
-        let hours_total_formula = Formula::new(format!(
-            "=ROUND(HOUR(F{0})+MINUTE(F{0})/60+SECOND(F{0})/3600, 2)",
-            row_idx + 1
-        ));
-
-        let task_name_format = Format::new()
-            .set_text_wrap()
-            .set_background_color("#EEEEEE")
-            .set_font_name("Nunito")
-            .set_font_size(10);
-        let time_difference_format = Format::new()
-            .set_text_wrap()
-            .set_background_color("#EEEEEE")
-            .set_font_name("Nunito")
-            .set_font_size(10);
-        let hours_total_format = Format::new()
-            .set_text_wrap()
-            .set_background_color("#EEEEEE")
-            .set_font_name("Nunito")
-            .set_bold()
-            .set_font_size(10);
-
-        let _ = worksheet.write_with_format(row_idx, 2, task.name.to_owned(), &task_name_format);
-        let _ = worksheet.write_with_format(row_idx, 3, start_time_xlsx, &date_format);
-        let _ = worksheet.write_with_format(row_idx, 4, end_time_xlsx, &date_format);
-        let _ = worksheet.write_formula_with_format(
-            row_idx,
-            5,
-            time_difference_formula,
-            &time_difference_format,
-        );
-        let _ = worksheet.write_formula_with_format(
-            row_idx,
-            6,
-            hours_total_formula,
-            &hours_total_format,
-        );
+            Ok(format!("Work is ended. Generated log file {}", file_path))
+        }
+        Err(_) => Err("Could not save workbook".to_string()),
     }
-
-    let current_dir_path = env::current_dir().unwrap();
-    let current_dir_path_string = current_dir_path.to_str().unwrap();
-    let file_path = format!("{}/{}.xlsx", current_dir_path_string, date);
-
-    let save_result = workbook.save(&file_path);
-
-    if let Err(_err) = save_result {
-        return Err("Could not save workbook".to_string());
-    }
-
-    Ok(format!("Work is ended. Generated log file {}", &file_path))
 }
 
 fn complete_current_task(
