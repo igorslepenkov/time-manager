@@ -6,8 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0.79"
 chrono = {version="0.4.31", features=["serde"]}
-colorful = "0.2.2"
+crossterm = "0.27.0"
+itertools = "0.12.1"
+ratatui = "0.26.0"
 regex = "1.10.3"
 rust_xlsxwriter = {version="0.61.0", features=["chrono"]}
 serde = {version="1.0.196", features=["derive"]}

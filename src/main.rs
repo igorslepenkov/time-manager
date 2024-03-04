@@ -1,239 +1,416 @@
-use colorful::Colorful;
-use regex::Regex;
-use std::{
-    env,
-    io::{self, BufRead},
-    path::PathBuf,
+use std::borrow::BorrowMut;
+
+use crossterm::{
+    event::{self, KeyCode},
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    ExecutableCommand,
+};
+use ratatui::{
+    layout::{Constraint, Direction, Layout},
+    prelude::{CrosstermBackend, Stylize, Terminal},
+    style::Style,
+    symbols,
+    widgets::{Block, Borders, Padding, Paragraph, Tabs, Wrap},
+    Frame,
 };
 
+use anyhow::Result;
+
+use std::{env, io::stdout, path::PathBuf};
+
 use time_manager::{
-    add_task_to_completed,
-    command::{get_command, ManagerCommand},
-    save_state_as_xlsx,
     state::{self, DailyState},
     task::NotCompletedTask,
+    ui::{tabs::Tab, AppStage, AppUiState, Control},
+    utils::calculate_total_working_hours,
 };
 
 const STATE_FILE_NAME: &str = "state.json";
 
-fn main() {
-    let current_exe_path = env::current_exe().unwrap();
-    let current_dir_path = current_exe_path.parent().unwrap();
-    let state_file_path = current_dir_path.join(STATE_FILE_NAME);
+struct App {
+    daily_state: DailyState,
+    ui_state: AppUiState,
+    should_quit: bool,
+    state_file_path: PathBuf,
+}
 
-    let mut stdin = io::stdin().lock();
+impl App {
+    fn init(state_file_path: &PathBuf) -> App {
+        let daily_state: DailyState = state::DailyState::init(state_file_path).unwrap();
 
-    let mut state: DailyState = state::DailyState::init(&state_file_path).unwrap();
+        App {
+            ui_state: AppUiState::init(),
+            daily_state,
+            should_quit: false,
+            state_file_path: state_file_path.clone(),
+        }
+    }
 
-    println!(
-        "Started work at {}",
-        state.start_time.format("%d/%m/%Y %H:%M")
-    );
-
-    loop {
-        println!("Please enter your command");
-
-        let mut command_string = String::new();
-        let command_get_result = stdin.read_line(&mut command_string);
-
-        match command_get_result {
-            Ok(_) => {
-                let parsed_arguments_result = get_command_arguments(command_string);
-
-                match parsed_arguments_result {
-                    Err(err) => {
-                        println!("{}", err);
-
-                        continue;
-                    }
-                    Ok(parsed_arguments) => {
-                        let command_arg = parsed_arguments.get(0);
-
-                        match command_arg {
-                            Some(command_arg) => {
-                                let command = get_command(command_arg);
-
-                                let command_result = execute_command(
-                                    &command,
-                                    parsed_arguments,
-                                    &mut state,
-                                    &state_file_path,
-                                );
-
-                                match command_result {
-                                    Err(err) => {
-                                        let error_string = format!("{}", err);
-
-                                        println!("{}", error_string.red());
+    fn update(&mut self) -> Result<()> {
+        if event::poll(std::time::Duration::from_millis(250))? {
+            if let event::Event::Key(key) = event::read()? {
+                if key.kind == event::KeyEventKind::Press {
+                    match key.code {
+                        KeyCode::Esc => self.quit(),
+                        KeyCode::Right => self.ui_state.switch_tabs_forward(),
+                        KeyCode::Left => self.ui_state.switch_tabs_backward(),
+                        KeyCode::Down => self.ui_state.switch_control_focus_forwards(),
+                        KeyCode::Up => self.ui_state.switch_control_focus_backwards(),
+                        KeyCode::Enter => self.submit(),
+                        KeyCode::Backspace => {
+                            if let Some(control_focused_mutex) = &self.ui_state.control_focused {
+                                let input = &mut *control_focused_mutex.lock().unwrap();
+                                match input {
+                                    Control::TaskNameInput(control)
+                                    | Control::EndCommentInput(control) => {
+                                        control.borrow_mut().remove_last_char_from_input()
                                     }
-                                    Ok(result) => {
-                                        let result_string = format!("{}", result);
-
-                                        println!("{}", result_string.green());
-
-                                        if let ManagerCommand::EndTrack = &command {
-                                            break;
-                                        }
-                                    }
+                                    _ => {}
                                 }
                             }
-                            None => {
-                                continue;
+                        }
+                        _ => {
+                            if let KeyCode::Char(char) = key.code {
+                                if let Some(control_focused_mutex) = &self.ui_state.control_focused
+                                {
+                                    let input = &mut *control_focused_mutex.lock().unwrap();
+                                    match input {
+                                        Control::TaskNameInput(control)
+                                        | Control::EndCommentInput(control) => {
+                                            control.borrow_mut().add_char_to_input(char)
+                                        }
+                                        _ => {}
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
-            Err(err) => {
-                println!("{}", err);
-                continue;
+        }
+        Ok(())
+    }
+
+    fn submit(&mut self) {
+        let ui_state = &mut self.ui_state;
+
+        let control_focused_option = &ui_state.control_focused;
+
+        if let Some(control_arc) = control_focused_option {
+            let control = control_arc.lock().unwrap();
+            let active_tab = ui_state.get_active_tab();
+
+            if let Control::SubmitBtn(_) = *control {
+                match active_tab {
+                    Tab::Start => {
+                        drop(control);
+
+                        let task_name = self.get_task_name_input().unwrap();
+                        let end_comment = self.get_end_comment_input();
+                        let _ = self.execute_start_command(task_name, end_comment);
+
+                        let current_stage = &mut self.ui_state.stage;
+                        if let AppStage::Waiting = current_stage {
+                            *current_stage = AppStage::Working
+                        }
+                    }
+                    Tab::End => {
+                        drop(control);
+
+                        let end_comment = self.get_end_comment_input();
+                        let _ = self.execute_end_command(end_comment);
+                    }
+                    Tab::Out => {
+                        drop(control);
+
+                        let end_comment = self.get_end_comment_input();
+                        let _ = self.execute_pause_command(end_comment);
+
+                        let current_stage = &mut self.ui_state.stage;
+                        if let AppStage::Working = current_stage {
+                            *current_stage = AppStage::Paused
+                        }
+                    }
+                    Tab::ClearState => {
+                        let _ = self.daily_state.clear_todays_state(&self.state_file_path);
+
+                        ui_state.stage = AppStage::Waiting;
+                    }
+                    _ => {}
+                }
             }
         }
+
+        self.ui_state.clear_inputs_state();
     }
-}
 
-fn get_command_arguments(arg_string: String) -> Result<Vec<String>, String> {
-    let regex = Regex::new(r"^(\w+)\s*(?:'([^']+)')*\s*(?:'(.*)')*").unwrap();
-    let arguments_match = regex.captures(&arg_string);
+    fn get_task_name_input(&mut self) -> Result<String, String> {
+        let task_name_input_lock = self.ui_state.task_name_input_state.lock();
+        let task_name_guard = task_name_input_lock.unwrap();
+        if let Control::TaskNameInput(state) = &*task_name_guard {
+            let input = state.input.to_owned();
 
-    match arguments_match {
-        None => return Err("Could not parse arguments".to_string()),
-        Some(capture) => {
-            let mut arguments: Vec<String> = Vec::new();
+            if input.len() == 0 {
+                return Err("You should enter new task name!".to_string());
+            }
 
-            let command_string_option = capture.get(1);
+            return Ok(input);
+        } else {
+            unreachable!()
+        };
+    }
 
-            let command_string = match command_string_option {
-                None => return Err("Could not get command".to_string()),
-                Some(match_string) => match_string.as_str().to_string(),
+    fn get_end_comment_input(&mut self) -> Option<String> {
+        let previous_task_comment_input_lock = self.ui_state.task_end_comment_input_state.lock();
+        let end_comment_guard = previous_task_comment_input_lock.unwrap();
+        let end_comment: Option<String> =
+            if let Control::EndCommentInput(state) = &*end_comment_guard {
+                let input = &state.input;
+
+                if input.len() == 0 {
+                    None
+                } else {
+                    Some(input.to_owned())
+                }
+            } else {
+                unreachable!()
             };
 
-            arguments.insert(0, command_string);
+        drop(end_comment_guard);
 
-            let task_name_option = capture.get(2);
-            if let Some(task_name_match) = task_name_option {
-                let string = task_name_match.as_str().to_string();
-                arguments.insert(1, string);
-            };
+        end_comment
+    }
 
-            let task_end_comment_option = capture.get(3);
-            if let Some(task_end_comment_match) = task_end_comment_option {
-                let string = task_end_comment_match.as_str().to_string();
-                arguments.insert(2, string);
+    fn ui(&self, frame: &mut Frame) {
+        let area = frame.size();
+        let current_task = &self.daily_state.current_task;
+        let total_working_hours = calculate_total_working_hours(&self.daily_state);
+
+        let app_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(vec![Constraint::Percentage(15), Constraint::Percentage(85)])
+            .split(area);
+
+        let top_layouts = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(app_layout[0]);
+
+        let top_left_internal_layouts = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(top_layouts[0]);
+
+        let top_right_internal_layouts = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(top_layouts[1]);
+
+        let main_layouts = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(vec![Constraint::Percentage(19), Constraint::Percentage(81)])
+            .split(app_layout[1]);
+
+        let main_top_sections = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(main_layouts[0]);
+
+        frame.render_widget(
+            Block::new()
+                .border_set(symbols::border::THICK)
+                .borders(Borders::all())
+                .padding(Padding::new(1, 1, 1, 1)),
+            main_layouts[1],
+        );
+
+        frame.render_widget(
+            Paragraph::new(format!(
+                "Started work at {}",
+                &self.daily_state.start_time.format("%d/%m/%Y %H:%M")
+            ))
+            .wrap(Wrap { trim: true })
+            .white()
+            .on_blue(),
+            top_left_internal_layouts[0],
+        );
+
+        frame.render_widget(
+            Paragraph::new(format!(
+                "You've been working for {0:.2} hours already",
+                total_working_hours
+            ))
+            .wrap(Wrap { trim: true })
+            .white()
+            .on_blue(),
+            top_right_internal_layouts[0],
+        );
+
+        frame.render_widget(
+            Paragraph::new("Current task: ")
+                .white()
+                .on_blue()
+                .wrap(Wrap { trim: true }),
+            top_left_internal_layouts[1],
+        );
+
+        let current_task_name = if let Some(task) = current_task {
+            task.name.to_owned()
+        } else {
+            String::new()
+        };
+
+        frame.render_widget(
+            Paragraph::new(current_task_name).white().on_blue(),
+            top_right_internal_layouts[1],
+        );
+
+        frame.render_widget(
+            Tabs::new(self.ui_state.tabs.to_owned())
+                .select(self.ui_state.get_active_tab_idx())
+                .highlight_style(Style::default().yellow())
+                .block(
+                    Block::new()
+                        .border_set(symbols::border::Set {
+                            bottom_left: symbols::line::NORMAL.vertical_right,
+                            bottom_right: symbols::line::NORMAL.vertical_left,
+                            ..symbols::border::THICK
+                        })
+                        .borders(Borders::TOP | Borders::LEFT | Borders::RIGHT)
+                        .title("Tabs"),
+                ),
+            main_top_sections[0],
+        );
+
+        match self.ui_state.get_active_tab() {
+            Tab::Home => self.ui_state.render_home_tab(frame, main_layouts[1]),
+            Tab::Start => self.ui_state.render_start_tab(frame, main_layouts[1]),
+            Tab::Out => self.ui_state.render_out_tab(frame, main_layouts[1]),
+            Tab::End => self.ui_state.render_end_tab(frame, main_layouts[1]),
+            Tab::ClearState => self.ui_state.render_clear_tab(frame, main_layouts[1]),
+        }
+    }
+
+    pub fn run(mut self) -> Result<()> {
+        let mut terminal = Terminal::new(CrosstermBackend::new(std::io::stderr()))?;
+
+        loop {
+            // application render
+            terminal.draw(|frame| {
+                self.ui(frame);
+            })?;
+
+            // application update
+            self.update()?;
+
+            // application exit
+            if self.should_quit {
+                break;
             }
-
-            Ok(arguments)
         }
+
+        Ok(())
     }
-}
 
-fn execute_command(
-    command: &ManagerCommand,
-    args_vec: Vec<String>,
-    state: &mut DailyState,
-    state_file_path: &PathBuf,
-) -> Result<String, String> {
-    match command {
-        ManagerCommand::StartTrack => execute_start_command(args_vec, state, state_file_path),
-
-        ManagerCommand::PauseTrack => execute_pause_command(args_vec, state, state_file_path),
-
-        ManagerCommand::EndTrack => execute_end_command(args_vec, state, state_file_path),
-
-        ManagerCommand::Error => Err("Could not find command".to_string()),
+    pub fn quit(&mut self) {
+        self.should_quit = true;
     }
-}
 
-fn execute_start_command(
-    args_vec: Vec<String>,
-    state: &mut DailyState,
-    state_file_path: &PathBuf,
-) -> Result<String, String> {
-    let task_name_option = args_vec.get(1);
+    fn execute_start_command(
+        &mut self,
+        new_task_name: String,
+        previous_task_completion_message: Option<String>,
+    ) -> Result<String, String> {
+        let state = &mut self.daily_state;
+        let state_file_path = &self.state_file_path;
 
-    match task_name_option {
-        None => Err("Please enter your task's name".to_string()),
-        Some(task_name) => {
-            let previous_task_completion_message = args_vec.get(2);
-            let complete_task_result =
-                complete_current_task(state, previous_task_completion_message);
+        let complete_task_result = state.complete_current_task(previous_task_completion_message);
 
-            if let Err(err) = complete_task_result {
-                return Err(err);
+        if let Err(err) = complete_task_result {
+            return Err(err);
+        }
+
+        let new_task = NotCompletedTask::start(new_task_name.to_string());
+
+        state.current_task.replace(new_task);
+
+        let _ = state.save(state_file_path);
+
+        Ok(format!("Started new task. Current task: {}", new_task_name))
+    }
+
+    fn execute_pause_command(
+        &mut self,
+        previous_task_completion_message: Option<String>,
+    ) -> Result<String, String> {
+        let state = &mut self.daily_state;
+        let state_file_path = &self.state_file_path;
+
+        let complete_task_result = state.complete_current_task(previous_task_completion_message);
+
+        state.current_task = None;
+
+        if let Err(err) = complete_task_result {
+            return Err(err);
+        }
+
+        let _ = state.save(state_file_path);
+
+        Ok("Track is paused. Out of keyboard".to_string())
+    }
+
+    fn execute_end_command(
+        &mut self,
+        previous_task_completion_message: Option<String>,
+    ) -> Result<String, String> {
+        let state = &mut self.daily_state;
+        let state_file_path = &self.state_file_path;
+
+        let complete_task_result = state.complete_current_task(previous_task_completion_message);
+
+        if let Err(err) = complete_task_result {
+            return Err(err);
+        }
+
+        let save_result = state.save_state_as_xlsx();
+
+        match save_result {
+            Ok(file_path) => {
+                let _ = state.clear_todays_state(state_file_path);
+
+                Ok(format!("Work is ended. Generated log file {}", file_path))
             }
-
-            let new_task = NotCompletedTask::start(task_name.to_string());
-
-            state.current_task.replace(new_task);
-
-            let _ = state.save(state_file_path);
-
-            Ok(format!("Started new task. Current task: {}", task_name))
+            Err(_) => Err("Could not save workbook".to_string()),
         }
     }
 }
 
-fn execute_pause_command(
-    args_vec: Vec<String>,
-    state: &mut DailyState,
-    state_file_path: &PathBuf,
-) -> Result<String, String> {
-    let previous_task_completion_message = args_vec.get(1);
-    let complete_task_result = complete_current_task(state, previous_task_completion_message);
+fn main() -> Result<()> {
+    let current_exe_path = env::current_exe().unwrap();
+    let current_dir_path = current_exe_path.parent().unwrap();
+    let state_file_path: PathBuf = current_dir_path.join(STATE_FILE_NAME);
 
-    state.current_task = None;
+    let app = App::init(&state_file_path);
 
-    if let Err(err) = complete_task_result {
-        return Err(err);
-    }
+    startup()?;
 
-    let _ = state.save(state_file_path);
+    let status = app.run();
 
-    println!("Track paused at {}", chrono::Local::now());
+    shutdown()?;
 
-    Ok("Track is paused. Out of keyboard".to_string())
+    status?;
+
+    Ok(())
 }
 
-fn execute_end_command(
-    args_vec: Vec<String>,
-    state: &mut DailyState,
-    state_file_path: &PathBuf,
-) -> Result<String, String> {
-    let previous_task_completion_message = args_vec.get(1);
-    let complete_task_result = complete_current_task(state, previous_task_completion_message);
-
-    if let Err(err) = complete_task_result {
-        return Err(err);
-    }
-
-    let save_result = save_state_as_xlsx(state);
-
-    match save_result {
-        Ok(file_path) => {
-            let _ = state.clear_todays_state(state_file_path);
-
-            Ok(format!("Work is ended. Generated log file {}", file_path))
-        }
-        Err(_) => Err("Could not save workbook".to_string()),
-    }
+fn startup() -> Result<()> {
+    enable_raw_mode()?;
+    stdout().execute(EnterAlternateScreen).unwrap();
+    Ok(())
 }
 
-fn complete_current_task(
-    state: &DailyState,
-    task_completion_message: Option<&String>,
-) -> Result<(), String> {
-    let current_task_option = &state.current_task;
-
-    if let Some(current_task) = current_task_option {
-        let completed_current_task = current_task.complete_task(None);
-
-        let add_result =
-            add_task_to_completed(state, completed_current_task, task_completion_message);
-
-        if let Err(err_string) = add_result {
-            return Err(err_string);
-        }
-    }
-
+fn shutdown() -> Result<()> {
+    stdout().execute(LeaveAlternateScreen).unwrap();
+    disable_raw_mode().unwrap();
     Ok(())
 }
