@@ -27,7 +27,7 @@ pub enum AppStage {
 }
 
 impl AppStage {
-    fn to_string(&self) -> String {
+    pub fn to_string(&self) -> String {
         match self {
             AppStage::Waiting => "Waiting for start".to_string(),
             AppStage::Working => "Working on task".to_string(),

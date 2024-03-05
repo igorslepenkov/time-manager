@@ -144,6 +144,11 @@ impl DailyState {
 
         let _ = worksheet.set_name(&date);
 
+        let _ = worksheet.set_column_width(0, 15);
+        let _ = worksheet.set_column_width(2, 40);
+
+        let _ = worksheet.set_name(&date);
+
         let _ = worksheet.write_with_format(0, 0, &date, &date_format);
 
         let completed_tasks = self.completed_tasks.lock().unwrap();
@@ -171,6 +176,8 @@ impl DailyState {
             .unwrap();
 
             let row_idx: u32 = idx.try_into().unwrap();
+
+            let _ = worksheet.set_row_height(row_idx, 50);
 
             let time_difference_formula = Formula::new(format!("=E{0}-D{0}", row_idx + 1));
             let hours_total_formula = Formula::new(format!(

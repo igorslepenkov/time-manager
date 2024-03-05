@@ -119,6 +119,11 @@ impl App {
 
                         let end_comment = self.get_end_comment_input();
                         let _ = self.execute_end_command(end_comment);
+
+                        let current_stage = &mut self.ui_state.stage;
+                        if let AppStage::Working = current_stage {
+                            *current_stage = AppStage::Waiting
+                        }
                     }
                     Tab::Out => {
                         drop(control);
@@ -213,7 +218,7 @@ impl App {
 
         let main_top_sections = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
+            .constraints(vec![Constraint::Percentage(70), Constraint::Percentage(30)])
             .split(main_layouts[0]);
 
         frame.render_widget(
@@ -257,11 +262,20 @@ impl App {
         let current_task_name = if let Some(task) = current_task {
             task.name.to_owned()
         } else {
-            String::new()
+            match self.ui_state.stage {
+                AppStage::Working => {
+                    unreachable!()
+                }
+                AppStage::Waiting => AppStage::Waiting.to_string(),
+                AppStage::Paused => AppStage::Paused.to_string(),
+            }
         };
 
         frame.render_widget(
-            Paragraph::new(current_task_name).white().on_blue(),
+            Paragraph::new(current_task_name)
+                .wrap(Wrap { trim: true })
+                .white()
+                .on_blue(),
             top_right_internal_layouts[1],
         );
 
@@ -386,6 +400,8 @@ impl App {
 }
 
 fn main() -> Result<()> {
+    initialize_panic_handler();
+
     let current_exe_path = env::current_exe().unwrap();
     let current_dir_path = current_exe_path.parent().unwrap();
     let state_file_path: PathBuf = current_dir_path.join(STATE_FILE_NAME);
@@ -413,4 +429,13 @@ fn shutdown() -> Result<()> {
     stdout().execute(LeaveAlternateScreen).unwrap();
     disable_raw_mode().unwrap();
     Ok(())
+}
+
+pub fn initialize_panic_handler() {
+    let original_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        crossterm::execute!(std::io::stderr(), crossterm::terminal::LeaveAlternateScreen).unwrap();
+        crossterm::terminal::disable_raw_mode().unwrap();
+        original_hook(panic_info);
+    }));
 }
