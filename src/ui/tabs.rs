@@ -11,9 +11,9 @@ pub enum Tab {
     ClearState,
 }
 
-impl Into<Line<'_>> for Tab {
-    fn into(self) -> Line<'static> {
-        match self {
+impl From<Tab> for Line<'_> {
+    fn from(val: Tab) -> Self {
+        match val {
             Tab::Home => Line::raw(Tab::Home.to_string()),
             Tab::Start => Line::raw(Tab::Start.to_string()),
             Tab::Out => Line::raw(Tab::Out.to_string()),
