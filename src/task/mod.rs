@@ -23,7 +23,7 @@ impl NotCompletedTask {
         }
     }
 
-    pub fn complete_task(self: &Self, end_comment: Option<String>) -> CompletedTask {
+    pub fn complete_task(&self, end_comment: Option<String>) -> CompletedTask {
         CompletedTask {
             name: self.name.to_string(),
             dt_start: self.dt_start.to_owned(),

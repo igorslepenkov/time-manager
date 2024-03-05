@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use ratatui::text::Line;
 
 #[derive(Eq, PartialEq)]
@@ -22,16 +24,6 @@ impl Into<Line<'_>> for Tab {
 }
 
 impl Tab {
-    pub fn to_string(&self) -> String {
-        match self {
-            Tab::Home => String::from("Home"),
-            Tab::Start => String::from("Start"),
-            Tab::Out => String::from("Out"),
-            Tab::End => String::from("End"),
-            Tab::ClearState => String::from("Clear State"),
-        }
-    }
-
     pub fn as_string_vec() -> Vec<String> {
         vec![
             Tab::Home.to_string(),
@@ -40,5 +32,17 @@ impl Tab {
             Tab::End.to_string(),
             Tab::ClearState.to_string(),
         ]
+    }
+}
+
+impl Display for Tab {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Tab::Home => write!(f, "Home"),
+            Tab::Start => write!(f, "Start"),
+            Tab::Out => write!(f, "Out"),
+            Tab::End => write!(f, "End"),
+            Tab::ClearState => write!(f, "Clear State"),
+        }
     }
 }

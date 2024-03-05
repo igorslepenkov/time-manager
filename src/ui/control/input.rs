@@ -21,7 +21,7 @@ impl Input {
         }
     }
 
-    pub fn clear_input(&mut self) -> () {
+    pub fn clear_input(&mut self) {
         self.input = String::new();
         self.is_focused = false;
     }
@@ -45,7 +45,7 @@ impl Input {
         frame: &mut Frame,
         area: Rect,
     ) {
-        let input = if input_state.input.len() > 0 {
+        let input = if !input_state.input.is_empty() {
             input_state.input.to_owned()
         } else {
             placeholder.to_owned()
@@ -81,7 +81,7 @@ impl Input {
     pub fn remove_last_char_from_input(&mut self) {
         let input_string = self.input.to_owned();
 
-        if input_string.len() == 0 {
+        if input_string.is_empty() {
             return;
         }
 

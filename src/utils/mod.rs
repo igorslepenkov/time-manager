@@ -3,7 +3,7 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 use crate::state::DailyState;
 
-const MILLISECONDS_IN_HOUR: f64 = 3600000 as f64;
+const MILLISECONDS_IN_HOUR: f64 = 3600000_f64;
 
 pub fn centered_rect(r: Rect, percent_x: u16, percent_y: u16) -> Rect {
     let popup_layout = Layout::default()

@@ -1,7 +1,10 @@
 pub mod control;
 pub mod tabs;
 
-use std::sync::{Arc, Mutex};
+use std::{
+    fmt::Display,
+    sync::{Arc, Mutex},
+};
 
 use itertools::Itertools;
 
@@ -26,12 +29,12 @@ pub enum AppStage {
     Paused,
 }
 
-impl AppStage {
-    pub fn to_string(&self) -> String {
+impl Display for AppStage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AppStage::Waiting => "Waiting for start".to_string(),
-            AppStage::Working => "Working on task".to_string(),
-            AppStage::Paused => "Track paused".to_string(),
+            AppStage::Waiting => write!(f, "Waiting for start"),
+            AppStage::Working => write!(f, "Working on task"),
+            AppStage::Paused => write!(f, "Track paused"),
         }
     }
 }
@@ -73,16 +76,13 @@ impl AppUiState {
 
             self.active_tab = new_tab_idx;
 
-            if tab.to_owned() == Tab::Start.to_string() {
+            if tab == Tab::Start.to_string() {
                 self.control_focused = Some(Arc::clone(&self.task_name_input));
                 self.task_name_input.lock().unwrap().set_focus();
-            } else if tab.to_owned() == Tab::End.to_string() {
+            } else if tab == Tab::End.to_string() || tab == Tab::Out.to_string() {
                 self.control_focused = Some(Arc::clone(&self.task_end_comment_input));
                 self.task_end_comment_input.lock().unwrap().set_focus();
-            } else if tab.to_owned() == Tab::Out.to_string() {
-                self.control_focused = Some(Arc::clone(&self.task_end_comment_input));
-                self.task_end_comment_input.lock().unwrap().set_focus();
-            } else if tab.to_owned() == Tab::ClearState.to_string() {
+            } else if tab == Tab::ClearState.to_string() {
                 self.control_focused = Some(Arc::clone(&self.submit_btn));
                 self.submit_btn.lock().unwrap().set_focus();
             } else {
@@ -109,16 +109,16 @@ impl AppUiState {
 
             self.active_tab = new_tab_idx;
 
-            if tab.to_owned() == Tab::Start.to_string() {
+            if tab == Tab::Start.to_string() {
                 self.control_focused = Some(Arc::clone(&self.task_name_input));
                 self.task_name_input.lock().unwrap().toggle_focus();
-            } else if tab.to_owned() == Tab::End.to_string() {
+            } else if tab == Tab::End.to_string() {
                 self.control_focused = Some(Arc::clone(&self.task_end_comment_input));
                 self.task_end_comment_input.lock().unwrap().toggle_focus();
-            } else if tab.to_owned() == Tab::Out.to_string() {
+            } else if tab == Tab::Out.to_string() {
                 self.control_focused = Some(Arc::clone(&self.task_end_comment_input));
                 self.task_end_comment_input.lock().unwrap().set_focus();
-            } else if tab.to_owned() == Tab::ClearState.to_string() {
+            } else if tab == Tab::ClearState.to_string() {
                 self.control_focused = Some(Arc::clone(&self.submit_btn));
                 self.submit_btn.lock().unwrap().set_focus();
             } else {

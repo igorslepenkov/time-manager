@@ -155,14 +155,14 @@ impl App {
         if let Control::TaskNameInput(state) = &*task_name_guard {
             let input = state.input.to_owned();
 
-            if input.len() == 0 {
+            if input.is_empty() {
                 return Err("You should enter new task name!".to_string());
             }
 
-            return Ok(input);
+            Ok(input)
         } else {
             unreachable!()
-        };
+        }
     }
 
     fn get_end_comment_input(&mut self) -> Option<String> {
@@ -172,7 +172,7 @@ impl App {
             if let Control::EndCommentInput(state) = &*end_comment_guard {
                 let input = &state.input;
 
-                if input.len() == 0 {
+                if input.is_empty() {
                     None
                 } else {
                     Some(input.to_owned())
@@ -338,11 +338,7 @@ impl App {
         let state = &mut self.daily_state;
         let state_file_path = &self.state_file_path;
 
-        let complete_task_result = state.complete_current_task(previous_task_completion_message);
-
-        if let Err(err) = complete_task_result {
-            return Err(err);
-        }
+        state.complete_current_task(previous_task_completion_message)?;
 
         let new_task = NotCompletedTask::start(new_task_name.to_string());
 
@@ -364,9 +360,7 @@ impl App {
 
         state.current_task = None;
 
-        if let Err(err) = complete_task_result {
-            return Err(err);
-        }
+        complete_task_result?;
 
         let _ = state.save(state_file_path);
 
@@ -380,11 +374,7 @@ impl App {
         let state = &mut self.daily_state;
         let state_file_path = &self.state_file_path;
 
-        let complete_task_result = state.complete_current_task(previous_task_completion_message);
-
-        if let Err(err) = complete_task_result {
-            return Err(err);
-        }
+        state.complete_current_task(previous_task_completion_message)?;
 
         let save_result = state.save_state_as_xlsx();
 

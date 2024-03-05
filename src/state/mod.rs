@@ -23,7 +23,7 @@ impl DailyState {
         DailyState::fetch_or_init_state(file_path)
     }
 
-    pub fn save(self: &Self, file_path: &PathBuf) -> Result<String, String> {
+    pub fn save(&self, file_path: &PathBuf) -> Result<String, String> {
         let result_with_string = serde_json::to_string(self);
 
         match result_with_string {
@@ -88,7 +88,7 @@ impl DailyState {
     }
 
     fn fetch_or_init_state(file_path: &PathBuf) -> Result<DailyState, String> {
-        let result_with_opened_file = File::open(&file_path);
+        let result_with_opened_file = File::open(file_path);
 
         match result_with_opened_file {
             Ok(mut file) => {
@@ -114,7 +114,7 @@ impl DailyState {
                 }
             }
             Err(_) => {
-                let result_with_new_file = File::create(&file_path);
+                let result_with_new_file = File::create(file_path);
 
                 match result_with_new_file {
                     Ok(_) => {
@@ -239,7 +239,7 @@ impl DailyState {
     ) -> Result<(), String> {
         let task_to_complite_option = self.current_task.take();
 
-        if let None = task_to_complite_option {
+        if task_to_complite_option.is_none() {
             return Ok(());
         }
 

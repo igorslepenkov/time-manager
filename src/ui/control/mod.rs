@@ -31,7 +31,7 @@ impl Control {
         }
     }
 
-    pub fn clear_input(&mut self) -> () {
+    pub fn clear_input(&mut self) {
         match self {
             Control::TaskNameInput(state) => state.clear_input(),
             Control::EndCommentInput(state) => state.clear_input(),
