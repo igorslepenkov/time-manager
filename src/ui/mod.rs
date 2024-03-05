@@ -37,23 +37,21 @@ impl AppStage {
 }
 
 pub struct AppUiState {
-    submit_btn_state: Arc<Mutex<Control>>,
+    submit_btn: Arc<Mutex<Control>>,
     active_tab: usize,
     pub tabs: Vec<String>,
     pub control_focused: Option<Arc<Mutex<Control>>>,
-    pub task_name_input_state: Arc<Mutex<Control>>,
-    pub task_end_comment_input_state: Arc<Mutex<Control>>,
+    pub task_name_input: Arc<Mutex<Control>>,
+    pub task_end_comment_input: Arc<Mutex<Control>>,
     pub stage: AppStage,
 }
 
 impl AppUiState {
     pub fn init() -> AppUiState {
         AppUiState {
-            task_end_comment_input_state: Arc::new(Mutex::new(Control::EndCommentInput(
-                Input::init(),
-            ))),
-            task_name_input_state: Arc::new(Mutex::new(Control::TaskNameInput(Input::init()))),
-            submit_btn_state: Arc::new(Mutex::new(Control::SubmitBtn(SubmitButton::init()))),
+            task_end_comment_input: Arc::new(Mutex::new(Control::EndCommentInput(Input::init()))),
+            task_name_input: Arc::new(Mutex::new(Control::TaskNameInput(Input::init()))),
+            submit_btn: Arc::new(Mutex::new(Control::SubmitBtn(SubmitButton::init()))),
             active_tab: 0_usize,
             tabs: Tab::as_string_vec(),
             control_focused: None,
@@ -76,23 +74,17 @@ impl AppUiState {
             self.active_tab = new_tab_idx;
 
             if tab.to_owned() == Tab::Start.to_string() {
-                self.control_focused = Some(Arc::clone(&self.task_name_input_state));
-                self.task_name_input_state.lock().unwrap().set_focus();
+                self.control_focused = Some(Arc::clone(&self.task_name_input));
+                self.task_name_input.lock().unwrap().set_focus();
             } else if tab.to_owned() == Tab::End.to_string() {
-                self.control_focused = Some(Arc::clone(&self.task_end_comment_input_state));
-                self.task_end_comment_input_state
-                    .lock()
-                    .unwrap()
-                    .set_focus();
+                self.control_focused = Some(Arc::clone(&self.task_end_comment_input));
+                self.task_end_comment_input.lock().unwrap().set_focus();
             } else if tab.to_owned() == Tab::Out.to_string() {
-                self.control_focused = Some(Arc::clone(&self.task_end_comment_input_state));
-                self.task_end_comment_input_state
-                    .lock()
-                    .unwrap()
-                    .set_focus();
+                self.control_focused = Some(Arc::clone(&self.task_end_comment_input));
+                self.task_end_comment_input.lock().unwrap().set_focus();
             } else if tab.to_owned() == Tab::ClearState.to_string() {
-                self.control_focused = Some(Arc::clone(&self.submit_btn_state));
-                self.submit_btn_state.lock().unwrap().set_focus();
+                self.control_focused = Some(Arc::clone(&self.submit_btn));
+                self.submit_btn.lock().unwrap().set_focus();
             } else {
                 self.control_focused = None
             }
@@ -118,23 +110,17 @@ impl AppUiState {
             self.active_tab = new_tab_idx;
 
             if tab.to_owned() == Tab::Start.to_string() {
-                self.control_focused = Some(Arc::clone(&self.task_name_input_state));
-                self.task_name_input_state.lock().unwrap().toggle_focus();
+                self.control_focused = Some(Arc::clone(&self.task_name_input));
+                self.task_name_input.lock().unwrap().toggle_focus();
             } else if tab.to_owned() == Tab::End.to_string() {
-                self.control_focused = Some(Arc::clone(&self.task_end_comment_input_state));
-                self.task_end_comment_input_state
-                    .lock()
-                    .unwrap()
-                    .toggle_focus();
+                self.control_focused = Some(Arc::clone(&self.task_end_comment_input));
+                self.task_end_comment_input.lock().unwrap().toggle_focus();
             } else if tab.to_owned() == Tab::Out.to_string() {
-                self.control_focused = Some(Arc::clone(&self.task_end_comment_input_state));
-                self.task_end_comment_input_state
-                    .lock()
-                    .unwrap()
-                    .set_focus();
+                self.control_focused = Some(Arc::clone(&self.task_end_comment_input));
+                self.task_end_comment_input.lock().unwrap().set_focus();
             } else if tab.to_owned() == Tab::ClearState.to_string() {
-                self.control_focused = Some(Arc::clone(&self.submit_btn_state));
-                self.submit_btn_state.lock().unwrap().set_focus();
+                self.control_focused = Some(Arc::clone(&self.submit_btn));
+                self.submit_btn.lock().unwrap().set_focus();
             } else {
                 self.control_focused = None
             }
@@ -153,26 +139,22 @@ impl AppUiState {
 
                     match &mut *input_focused {
                         Control::TaskNameInput(state) => {
-                            self.control_focused =
-                                Some(Arc::clone(&self.task_end_comment_input_state));
+                            self.control_focused = Some(Arc::clone(&self.task_end_comment_input));
 
                             state.unset_focus();
-                            self.task_end_comment_input_state
-                                .lock()
-                                .unwrap()
-                                .set_focus();
+                            self.task_end_comment_input.lock().unwrap().set_focus();
                         }
                         Control::EndCommentInput(state) => {
-                            self.control_focused = Some(Arc::clone(&self.submit_btn_state));
+                            self.control_focused = Some(Arc::clone(&self.submit_btn));
 
                             state.unset_focus();
-                            self.submit_btn_state.lock().unwrap().set_focus();
+                            self.submit_btn.lock().unwrap().set_focus();
                         }
                         Control::SubmitBtn(state) => {
-                            self.control_focused = Some(Arc::clone(&self.task_name_input_state));
+                            self.control_focused = Some(Arc::clone(&self.task_name_input));
 
                             state.unset_focus();
-                            self.task_name_input_state.lock().unwrap().set_focus();
+                            self.task_name_input.lock().unwrap().set_focus();
                         }
                     }
                 }
@@ -185,20 +167,16 @@ impl AppUiState {
 
                     match &mut *input_focused {
                         Control::EndCommentInput(state) => {
-                            self.control_focused = Some(Arc::clone(&self.submit_btn_state));
+                            self.control_focused = Some(Arc::clone(&self.submit_btn));
 
                             state.unset_focus();
-                            self.submit_btn_state.lock().unwrap().set_focus();
+                            self.submit_btn.lock().unwrap().set_focus();
                         }
                         Control::SubmitBtn(state) => {
-                            self.control_focused =
-                                Some(Arc::clone(&self.task_end_comment_input_state));
+                            self.control_focused = Some(Arc::clone(&self.task_end_comment_input));
 
                             state.unset_focus();
-                            self.task_end_comment_input_state
-                                .lock()
-                                .unwrap()
-                                .set_focus();
+                            self.task_end_comment_input.lock().unwrap().set_focus();
                         }
                         _ => {}
                     }
@@ -220,26 +198,22 @@ impl AppUiState {
 
                     match &mut *input_focused {
                         Control::TaskNameInput(state) => {
-                            self.control_focused = Some(Arc::clone(&self.submit_btn_state));
+                            self.control_focused = Some(Arc::clone(&self.submit_btn));
 
                             state.unset_focus();
-                            self.submit_btn_state.lock().unwrap().set_focus();
+                            self.submit_btn.lock().unwrap().set_focus();
                         }
                         Control::EndCommentInput(state) => {
-                            self.control_focused = Some(Arc::clone(&self.task_name_input_state));
+                            self.control_focused = Some(Arc::clone(&self.task_name_input));
 
                             state.unset_focus();
-                            self.task_name_input_state.lock().unwrap().set_focus();
+                            self.task_name_input.lock().unwrap().set_focus();
                         }
                         Control::SubmitBtn(state) => {
-                            self.control_focused =
-                                Some(Arc::clone(&self.task_end_comment_input_state));
+                            self.control_focused = Some(Arc::clone(&self.task_end_comment_input));
 
                             state.unset_focus();
-                            self.task_end_comment_input_state
-                                .lock()
-                                .unwrap()
-                                .set_focus();
+                            self.task_end_comment_input.lock().unwrap().set_focus();
                         }
                     }
                 }
@@ -252,20 +226,16 @@ impl AppUiState {
 
                     match &mut *input_focused {
                         Control::EndCommentInput(state) => {
-                            self.control_focused = Some(Arc::clone(&self.submit_btn_state));
+                            self.control_focused = Some(Arc::clone(&self.submit_btn));
 
                             state.unset_focus();
-                            self.submit_btn_state.lock().unwrap().set_focus();
+                            self.submit_btn.lock().unwrap().set_focus();
                         }
                         Control::SubmitBtn(state) => {
-                            self.control_focused =
-                                Some(Arc::clone(&self.task_end_comment_input_state));
+                            self.control_focused = Some(Arc::clone(&self.task_end_comment_input));
 
                             state.unset_focus();
-                            self.task_end_comment_input_state
-                                .lock()
-                                .unwrap()
-                                .set_focus();
+                            self.task_end_comment_input.lock().unwrap().set_focus();
                         }
                         _ => {}
                     }
@@ -276,12 +246,9 @@ impl AppUiState {
     }
 
     pub fn clear_inputs_state(&mut self) {
-        self.task_name_input_state.lock().unwrap().clear_input();
-        self.task_end_comment_input_state
-            .lock()
-            .unwrap()
-            .clear_input();
-        self.submit_btn_state.lock().unwrap().unset_focus();
+        self.task_name_input.lock().unwrap().clear_input();
+        self.task_end_comment_input.lock().unwrap().clear_input();
+        self.submit_btn.lock().unwrap().unset_focus();
     }
 
     pub fn get_active_tab(&self) -> Tab {
@@ -376,16 +343,16 @@ impl AppUiState {
             ])
             .split(inner_area);
 
-        self.task_name_input_state
+        self.task_name_input
             .lock()
             .unwrap()
             .render(frame, area_vertical_layouts[0]);
 
-        self.task_end_comment_input_state
+        self.task_end_comment_input
             .lock()
             .unwrap()
             .render(frame, area_vertical_layouts[1]);
-        self.submit_btn_state
+        self.submit_btn
             .lock()
             .unwrap()
             .render(frame, area_vertical_layouts[2])
@@ -409,12 +376,12 @@ impl AppUiState {
 
         let task_end_comment_rect = centered_rect(area_vertical_layouts[1], 100, 80);
 
-        self.task_end_comment_input_state
+        self.task_end_comment_input
             .lock()
             .unwrap()
             .render(frame, task_end_comment_rect);
 
-        self.submit_btn_state
+        self.submit_btn
             .lock()
             .unwrap()
             .render(frame, area_vertical_layouts[2])
@@ -430,11 +397,11 @@ impl AppUiState {
 
         let inner_bottom_area = centered_rect(area_vertical_layouts[1], 50, 50);
 
-        self.task_end_comment_input_state
+        self.task_end_comment_input
             .lock()
             .unwrap()
             .render(frame, area_vertical_layouts[0]);
-        self.submit_btn_state
+        self.submit_btn
             .lock()
             .unwrap()
             .render(frame, inner_bottom_area)
@@ -456,7 +423,7 @@ impl AppUiState {
         let paragraph = Paragraph::new(text).alignment(Alignment::Center);
         frame.render_widget(paragraph, area_vertical_layouts[0]);
 
-        self.submit_btn_state
+        self.submit_btn
             .lock()
             .unwrap()
             .render(frame, area_vertical_layouts[1])

@@ -150,7 +150,7 @@ impl App {
     }
 
     fn get_task_name_input(&mut self) -> Result<String, String> {
-        let task_name_input_lock = self.ui_state.task_name_input_state.lock();
+        let task_name_input_lock = self.ui_state.task_name_input.lock();
         let task_name_guard = task_name_input_lock.unwrap();
         if let Control::TaskNameInput(state) = &*task_name_guard {
             let input = state.input.to_owned();
@@ -166,7 +166,7 @@ impl App {
     }
 
     fn get_end_comment_input(&mut self) -> Option<String> {
-        let previous_task_comment_input_lock = self.ui_state.task_end_comment_input_state.lock();
+        let previous_task_comment_input_lock = self.ui_state.task_end_comment_input.lock();
         let end_comment_guard = previous_task_comment_input_lock.unwrap();
         let end_comment: Option<String> =
             if let Control::EndCommentInput(state) = &*end_comment_guard {
