@@ -1,15 +1,27 @@
 pub mod input;
 pub mod submit_btn;
 
+use std::fmt::Display;
+
 use ratatui::{layout::Rect, Frame};
 
 pub use self::{input::Input, submit_btn::SubmitButton};
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum Control {
     EndCommentInput(Input),
     TaskNameInput(Input),
     SubmitBtn(SubmitButton),
+}
+
+impl Display for Control {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Control::TaskNameInput(_) => write!(f, "Task name"),
+            Control::EndCommentInput(_) => write!(f, "Task end comment"),
+            Control::SubmitBtn(_) => write!(f, "Submit btn"),
+        }
+    }
 }
 
 impl Control {

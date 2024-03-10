@@ -8,7 +8,7 @@ use ratatui::{
 
 use crate::utils;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct SubmitButton {
     pub is_focused: bool,
 }

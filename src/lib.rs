@@ -1,3 +1,4 @@
+pub mod app;
 pub mod state;
 pub mod task;
 pub mod theme;

@@ -7,7 +7,7 @@ use ratatui::{
     Frame,
 };
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Input {
     pub is_focused: bool,
     pub input: String,

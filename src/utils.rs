@@ -1,7 +1,10 @@
+use std::sync::MutexGuard;
+
 use chrono::Local;
+use itertools::Itertools;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
-use crate::state::DailyState;
+use crate::{state::DailyState, task::CompletedTask, ui::Input};
 
 const MILLISECONDS_IN_HOUR: f64 = 3600000_f64;
 
@@ -61,5 +64,34 @@ pub fn calculate_total_working_hours(state: &DailyState) -> f64 {
         result_in_hours + diff_in_hours
     } else {
         result_in_hours
+    }
+}
+
+pub fn set_task_name_from_previous_tasks(
+    input_state: &mut Input,
+    completed_tasks: MutexGuard<'_, Vec<CompletedTask>>,
+) {
+    let current_task_name = &input_state.input;
+
+    let task_search_idx_result = completed_tasks
+        .iter()
+        .find_position(|task| task.name == current_task_name.to_owned());
+
+    match task_search_idx_result {
+        Some((idx, _)) => {
+            if idx == 0_usize {
+                input_state.input = String::new()
+            } else {
+                let new_task_idx = idx - 1;
+                let new_task = &completed_tasks[new_task_idx];
+
+                input_state.input = new_task.name.to_owned();
+            }
+        }
+        None => {
+            let last_completed_task = completed_tasks.last().unwrap();
+
+            input_state.input = last_completed_task.name.to_owned();
+        }
     }
 }

@@ -428,4 +428,14 @@ impl AppUiState {
             .unwrap()
             .render(frame, area_vertical_layouts[1])
     }
+
+    pub fn get_active_control_as_string(&self) -> Option<String> {
+        if let Some(control_mutex) = &self.control_focused {
+            let control = control_mutex.lock().unwrap();
+
+            Some(control.to_string())
+        } else {
+            None
+        }
+    }
 }
