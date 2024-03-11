@@ -18,7 +18,7 @@ use crate::{
     state::{self, DailyState},
     task::NotCompletedTask,
     ui::{tabs::Tab, AppStage, AppUiState, Control},
-    utils::calculate_total_working_hours,
+    utils::{calculate_total_working_hours, set_task_name_from_previous_tasks},
 };
 
 pub struct App {
@@ -49,7 +49,30 @@ impl App {
                         KeyCode::Right => self.ui_state.switch_tabs_forward(),
                         KeyCode::Left => self.ui_state.switch_tabs_backward(),
                         KeyCode::Down => self.ui_state.switch_control_focus_forwards(),
-                        KeyCode::Up => self.ui_state.switch_control_focus_backwards(),
+                        // KeyCode::Up => self.ui_state.switch_control_focus_backwards(),
+                        KeyCode::Up => {
+                            let active_control = &self.ui_state.control_focused;
+
+                            if let Some(ref control_mutex) = active_control {
+                                let mut control = control_mutex.lock().unwrap();
+
+                                let completed_tasks =
+                                    self.daily_state.completed_tasks.lock().unwrap();
+
+                                if !completed_tasks.is_empty() {
+                                    if let Control::TaskNameInput(ref mut input_state) = *control {
+                                        set_task_name_from_previous_tasks(
+                                            input_state,
+                                            completed_tasks,
+                                        );
+
+                                        return Ok(());
+                                    }
+                                }
+                            }
+
+                            self.ui_state.switch_control_focus_backwards()
+                        }
                         KeyCode::Enter => self.submit(),
                         KeyCode::Backspace => {
                             if let Some(control_focused_mutex) = &self.ui_state.control_focused {
