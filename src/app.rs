@@ -33,7 +33,7 @@ pub struct App {
 
 impl App {
     pub fn init(state_file_path: &PathBuf) -> App {
-        let prediction_model_bytes = include_bytes!("./tag_predict_model.onnx");
+        let prediction_model_bytes = include_bytes!("./../model/tag_predict_model.onnx");
 
         let daily_state: DailyState = state::DailyState::init(state_file_path).unwrap();
 
