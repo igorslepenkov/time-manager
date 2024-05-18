@@ -4,10 +4,7 @@ use std::io::prelude::*;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use crate::{
-    task::{CompletedTask, NotCompletedTask},
-    // utils::predict_task_tag,
-};
+use crate::task::{CompletedTask, NotCompletedTask};
 
 use chrono::prelude::*;
 use ort::{inputs, Session, Value};
@@ -149,6 +146,7 @@ impl DailyState {
         let _ = worksheet.set_name(&date);
 
         let _ = worksheet.set_column_width(0, 15);
+        let _ = worksheet.set_column_width(1, 25);
         let _ = worksheet.set_column_width(2, 40);
 
         let _ = worksheet.set_name(&date);
@@ -217,7 +215,7 @@ impl DailyState {
                 .try_extract_raw_string_tensor()
                 .unwrap();
 
-            let _ = worksheet.write(row_idx, 1, &task_tags[0]);
+            let _ = worksheet.write_with_format(row_idx, 1, &task_tags[0], &task_name_format);
             let _ =
                 worksheet.write_with_format(row_idx, 2, task.name.to_owned(), &task_name_format);
             let _ = worksheet.write_with_format(row_idx, 3, start_time_xlsx, &date_format);

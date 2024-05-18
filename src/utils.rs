@@ -95,22 +95,3 @@ pub fn set_task_name_from_previous_tasks(
         }
     }
 }
-
-// pub fn predict_task_tag(task_text: String) -> String {
-//     let tag_prediction_module_str =
-//         include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/python/app.py"));
-
-//     let result = Python::with_gil(|py| -> PyResult<Py<PyAny>> {
-//         let app: Py<PyAny> = PyModule::from_code_bound(py, &tag_prediction_module_str, "", "")?
-//             .getattr("run")?
-//             .into();
-
-//         let args = PyTuple::new_bound(py, &[task_text]);
-//         app.call1(py, args)
-//     });
-
-//     match result {
-//         Err(_err) => "".to_string(),
-//         Ok(res) => res.to_string(),
-//     }
-// }
