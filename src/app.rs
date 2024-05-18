@@ -21,15 +21,20 @@ use crate::{
     utils::{calculate_total_working_hours, set_task_name_from_previous_tasks},
 };
 
+use ort::{GraphOptimizationLevel, Session};
+
 pub struct App {
     daily_state: DailyState,
     ui_state: AppUiState,
     should_quit: bool,
     state_file_path: PathBuf,
+    prediction_model_session: Session,
 }
 
 impl App {
     pub fn init(state_file_path: &PathBuf) -> App {
+        let prediction_model_bytes = include_bytes!("./tag_predict_model.onnx");
+
         let daily_state: DailyState = state::DailyState::init(state_file_path).unwrap();
 
         App {
@@ -37,6 +42,12 @@ impl App {
             daily_state,
             should_quit: false,
             state_file_path: state_file_path.clone(),
+            prediction_model_session: Session::builder()
+                .unwrap()
+                .with_optimization_level(GraphOptimizationLevel::Level3)
+                .unwrap()
+                .commit_from_memory(prediction_model_bytes)
+                .unwrap(),
         }
     }
 
@@ -393,7 +404,7 @@ impl App {
 
         state.complete_current_task(previous_task_completion_message)?;
 
-        let save_result = state.save_state_as_xlsx();
+        let save_result = state.save_state_as_xlsx(&self.prediction_model_session);
 
         match save_result {
             Ok(file_path) => {

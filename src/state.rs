@@ -4,9 +4,13 @@ use std::io::prelude::*;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use crate::task::{CompletedTask, NotCompletedTask};
+use crate::{
+    task::{CompletedTask, NotCompletedTask},
+    // utils::predict_task_tag,
+};
 
 use chrono::prelude::*;
+use ort::{inputs, Session, Value};
 use rust_xlsxwriter::{ExcelDateTime, Format, Formula, Workbook};
 use serde::{Deserialize, Serialize};
 
@@ -128,7 +132,7 @@ impl DailyState {
         }
     }
 
-    pub fn save_state_as_xlsx(&mut self) -> Result<String, ()> {
+    pub fn save_state_as_xlsx(&mut self, model: &Session) -> Result<String, ()> {
         let mut workbook = Workbook::new();
         let worksheet = workbook.add_worksheet();
 
@@ -202,6 +206,18 @@ impl DailyState {
                 .set_bold()
                 .set_font_size(10);
 
+            let x = vec![task.name.to_owned()];
+            let allocator = model.allocator();
+            let data = ([x.len()], x.into_boxed_slice());
+            let input = inputs![Value::from_string_array(allocator, data)?].unwrap();
+
+            let prediction_model_outputs = model.run(input).unwrap();
+
+            let (_length, task_tags) = &prediction_model_outputs[0]
+                .try_extract_raw_string_tensor()
+                .unwrap();
+
+            let _ = worksheet.write(row_idx, 1, &task_tags[0]);
             let _ =
                 worksheet.write_with_format(row_idx, 2, task.name.to_owned(), &task_name_format);
             let _ = worksheet.write_with_format(row_idx, 3, start_time_xlsx, &date_format);
