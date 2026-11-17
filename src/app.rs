@@ -34,7 +34,7 @@ use crate::{
 use ort::Session;
 
 const CONFIG_FILE_NAME: &str = "config.json";
-const LOG_FILE_NAME: &str = "time-manager.log";
+const LOG_FILE_NAME: &str = "sc-time-manager.log";
 
 /// Незакрытая вчерашняя смена: её видно до тех пор, пока пользователь не решит,
 /// что с ней делать.
