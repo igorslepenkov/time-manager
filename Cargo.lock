@@ -953,10 +953,10 @@ dependencies = [
  "itertools",
  "ort",
  "ratatui",
- "regex",
  "rust_xlsxwriter",
  "serde",
  "serde_json",
+ "winapi",
 ]
 
 [[package]]

@@ -31,4 +31,19 @@ impl NotCompletedTask {
             end_comment,
         }
     }
+
+    /// Завершает задачу заданным временем — нужно, когда вчерашнюю смену
+    /// закрывают задним числом при следующем запуске.
+    pub fn complete_task_at(
+        &self,
+        dt_end: DateTime<Local>,
+        end_comment: Option<String>,
+    ) -> CompletedTask {
+        CompletedTask {
+            name: self.name.to_string(),
+            dt_start: self.dt_start.to_owned(),
+            dt_end,
+            end_comment,
+        }
+    }
 }

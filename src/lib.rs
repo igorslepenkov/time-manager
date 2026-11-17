@@ -1,5 +1,11 @@
 pub mod app;
+pub mod clipboard;
+pub mod config;
+pub mod export;
+pub mod i18n;
+pub mod settings;
 pub mod state;
+pub mod tagging;
 pub mod task;
 pub mod theme;
 pub mod ui;

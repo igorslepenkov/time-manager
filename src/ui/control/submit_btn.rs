@@ -1,11 +1,12 @@
 use ratatui::{
     layout::{Alignment, Rect},
-    style::{Style, Stylize},
+    style::Style,
     symbols,
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
 
+use crate::theme::theme;
 use crate::utils;
 
 #[derive(Clone, PartialEq)]
@@ -18,10 +19,6 @@ impl SubmitButton {
         SubmitButton { is_focused: false }
     }
 
-    pub fn toggle_focus(&mut self) {
-        self.is_focused = !self.is_focused
-    }
-
     pub fn set_focus(&mut self) {
         self.is_focused = true
     }
@@ -30,27 +27,27 @@ impl SubmitButton {
         self.is_focused = false
     }
 
-    pub fn render(state: &SubmitButton, frame: &mut Frame, area: Rect) {
+    pub fn render(state: &SubmitButton, frame: &mut Frame, area: Rect, label: &str) {
         let centered_button = utils::centered_rect(area, 50, 100);
 
-        let mut paragraph_border_style = Style::new().blue();
+        let mut paragraph_border_style = Style::new().fg(theme().border);
 
         if state.is_focused {
-            paragraph_border_style = paragraph_border_style.yellow();
+            paragraph_border_style = Style::new().fg(theme().accent);
         }
 
         let mut paragraph_block = Block::default()
             .borders(Borders::ALL)
             .border_style(paragraph_border_style);
 
-        let mut paragraph_style = Style::new().on_blue();
+        let mut paragraph_style = Style::new().fg(theme().panel_text).bg(theme().panel);
 
         if state.is_focused {
             paragraph_block = paragraph_block.border_set(symbols::border::THICK);
-            paragraph_style = paragraph_style.on_yellow();
+            paragraph_style = Style::new().fg(theme().accent_text).bg(theme().accent);
         }
 
-        let paragraph = Paragraph::new("Submit")
+        let paragraph = Paragraph::new(label)
             .alignment(Alignment::Center)
             .block(paragraph_block)
             .style(paragraph_style);

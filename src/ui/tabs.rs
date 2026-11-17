@@ -1,48 +1,53 @@
-use std::fmt::Display;
+use crate::i18n::t;
 
-use ratatui::text::Line;
-
-#[derive(Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum Tab {
     Home,
     Start,
     Out,
     End,
     ClearState,
-}
-
-impl From<Tab> for Line<'_> {
-    fn from(val: Tab) -> Self {
-        match val {
-            Tab::Home => Line::raw(Tab::Home.to_string()),
-            Tab::Start => Line::raw(Tab::Start.to_string()),
-            Tab::Out => Line::raw(Tab::Out.to_string()),
-            Tab::End => Line::raw(Tab::Out.to_string()),
-            Tab::ClearState => Line::raw(Tab::ClearState.to_string()),
-        }
-    }
+    Theme,
 }
 
 impl Tab {
-    pub fn as_string_vec() -> Vec<String> {
-        vec![
-            Tab::Home.to_string(),
-            Tab::Start.to_string(),
-            Tab::Out.to_string(),
-            Tab::End.to_string(),
-            Tab::ClearState.to_string(),
-        ]
-    }
-}
+    /// Сколько вкладок в панели.
+    pub const COUNT: usize = 6;
 
-impl Display for Tab {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    /// Позиция вкладки в панели — не зависит от языка.
+    pub const fn index(&self) -> usize {
         match self {
-            Tab::Home => write!(f, "Home"),
-            Tab::Start => write!(f, "Start"),
-            Tab::Out => write!(f, "Out"),
-            Tab::End => write!(f, "End"),
-            Tab::ClearState => write!(f, "Clear State"),
+            Tab::Home => 0,
+            Tab::Start => 1,
+            Tab::Out => 2,
+            Tab::End => 3,
+            Tab::ClearState => 4,
+            Tab::Theme => 5,
         }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Tab::Home => t("Home", "Главная"),
+            Tab::Start => t("Start", "Старт"),
+            Tab::Out => t("Pause", "Пауза"),
+            Tab::End => t("End of day", "Конец дня"),
+            Tab::Theme => t("Config", "Конфиг"),
+            Tab::ClearState => t("Clear day", "Сброс дня"),
+        }
+    }
+
+    pub fn as_string_vec() -> Vec<String> {
+        [
+            Tab::Home,
+            Tab::Start,
+            Tab::Out,
+            Tab::End,
+            Tab::ClearState,
+            Tab::Theme,
+        ]
+        .iter()
+        .map(|tab| tab.label().to_string())
+        .collect()
     }
 }
