@@ -1,1 +1,23 @@
-/target
+# Папки сборки и локальные инструменты
+target/
+dist/
+tools/
+
+# Артефакты сборки и мусор
+.idea/
+.vscode/
+*.exe
+*.pdb
+*.lnk
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+__pycache__/
+.venv/
+
+# Сертификаты и ключи подписи
+*.pfx
+*.p12
+*.cer
+*.key

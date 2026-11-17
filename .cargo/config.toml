@@ -1,0 +1,4 @@
+# Сборка с статическим CRT: exe не требует установленного
+# Visual C++ Redistributable и переносится одним файлом.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
